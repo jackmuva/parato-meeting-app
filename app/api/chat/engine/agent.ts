@@ -1,9 +1,37 @@
 import {FunctionTool, OpenAIAgent, QueryEngineTool} from "llamaindex";
-import {createSalesforceContact, sendSlack, signJwt} from "@/app/utility/request-utilities";
+import {
+    createAsanaTask,
+    createSalesforceContact,
+    createSalesforceOpportunity,
+    sendSlack,
+    signJwt
+} from "@/app/utility/request-utilities";
 import {getDataSource} from "@/app/api/chat/engine/index";
 import {generateFilters} from "@/app/api/chat/engine/queryFilter";
 
 export async function createAgent(userId: string | (() => string), documentIds?: string[], params?: any): Promise<OpenAIAgent>{
+    const summarizeTranscript = FunctionTool.from(
+        ({ transcript}: { transcript: string; }) => {
+            return "Transcript: " + transcript;
+        },
+        {
+            name: "summarizeTranscript",
+            description: "Use this function when a user asks for a meeting transcript to be summarized. " +
+                "Based off the transcript present the option to draft a Salesforce Opportunity, send a Slack Message, " +
+                "or create a task in Asana",
+            parameters: {
+                type: "object",
+                properties: {
+                    transcript: {
+                        type: "string",
+                        description: "Transcript of a meeting",
+                    },
+                },
+                required: ["transcript"],
+            },
+        }
+    );
+
     const draftSlackMessage = FunctionTool.from(
         ({ message}: { message: string; }) => {
             console.log("draft slack message: " + message);
@@ -78,7 +106,7 @@ export async function createAgent(userId: string | (() => string), documentIds?:
             name: "draftSalesforceContact",
             description: "Use this function to draft a contact record in Salesforce. This is a required function step" +
                 "before creating a contact record in Salesforce. Prompt confirmation from " +
-                "user to trigger the Salesforce record confirm and send step. This function does not create the Contact record" +
+                "user to trigger the Salesforce Contact record confirm and send step. This function does not create the Contact record" +
                 "in Salesforce. This function only drafts a Contact record and prompts for confirmation",
             parameters: {
                 type: "object",
@@ -150,6 +178,175 @@ export async function createAgent(userId: string | (() => string), documentIds?:
         }
     );
 
+    const draftSalesforceOpportunity = FunctionTool.from(
+        ({opportunity_name, budget, authority, need, timing }: { confirmation: string, opportunity_name: string, budget: string, authority: string, need: string, timing: string}) => {
+            console.log("Saleforce Opportunity Draft:");
+            console.log("Salesforce Opportunity name: " + opportunity_name);
+            console.log("Salesforce Opportunity budget: " + budget);
+            console.log("Salesforce Opportunity authority: " + authority);
+            console.log("Salesforce Opportunity need: " + need);
+            console.log("Salesforce Opportunity timing: " + timing);
+            return "Salesforce Opportunity name: " + opportunity_name +
+                "Salesforce Opportunity budget: " + budget +
+                "Salesforce Opportunity authority: " + authority +
+                "Salesforce Opportunity need: " + need +
+                "Salesforce Opportunity timing: " + timing;
+        },
+        {
+            name: "draftSalesforceOpportunity",
+            description: "Use this function to draft an opportunity record in Salesforce. This is a required function step" +
+                "before creating an opportunity record in Salesforce. Prompt confirmation from " +
+                "user to trigger the Salesforce Opportunity record confirm and send step. This function does not create the Opportunity record" +
+                "in Salesforce. This function only drafts a Opportunity record and prompts for confirmation",
+            parameters: {
+                type: "object",
+                properties: {
+                    confirmation: {
+                        type: "string",
+                        description: "affirmative confirmation to create Salesforce Contact record"
+                    },
+                    opportunity_name: {
+                        type: "string",
+                        description: "Opportunity name of Salesforce Opportunity",
+                    },
+                    budget: {
+                        type: "string",
+                        description: "The party's budget",
+                    },
+                    authority: {
+                        type: "string",
+                        description: "Level of authority or decision making power this person has",
+                    },
+                    need: {
+                        type: "string",
+                        description: "How much a prospect needs our product",
+                    },
+                    timing: {
+                        type: "string",
+                        description: "Time to make a decision on purchasing"
+                    }
+                },
+                required: ["confirmation", "opportunity_name", "budget", "authority", "need", "timing"],
+            },
+        }
+    );
+
+    const confirmAndCreateSalesforceOpportunity = FunctionTool.from(
+        async({ confirmation, opportunity_name, budget__c, authority__c, need__c, timing__c }: { confirmation: string, opportunity_name: string, budget__c: string, authority__c: string, need__c: string, timing__c: string}) => {
+            console.log("Confirmed Salesforce Opportunity Creation: " + confirmation);
+            const response = await createSalesforceOpportunity({opportunity_name, budget__c, authority__c, need__c, timing__c}, signJwt(userId));
+            console.log(response);
+            if(response.status === '200' || response.status){
+                return "Successfully created Salesforce Opportunity";
+            }
+            console.log("error");
+            return response.error;
+        },
+        {
+            name: "confirmAndCreateSalesforceOpportunity",
+            description: "Use this function to create a Salesforce Opportunity record only after a draft has been created. Do" +
+                "not use this function if an affirmative confirmation is not given. Do not use this function if" +
+                "a draft Salesforce Opportunity record has not been created",
+            parameters: {
+                type: "object",
+                properties: {
+                    confirmation: {
+                        type: "string",
+                        description: "affirmative confirmation to create Salesforce Contact record"
+                    },
+                    opportunity_name: {
+                        type: "string",
+                        description: "Opportunity name of Salesforce Opportunity",
+                    },
+                    budget__c: {
+                        type: "string",
+                        description: "The party's budget",
+                    },
+                    authority__c: {
+                        type: "string",
+                        description: "Level of authority or decision making power this person has",
+                    },
+                    need__c: {
+                        type: "string",
+                        description: "What use case does the prospect need our productt for",
+                    },
+                    timing__c: {
+                        type: "string",
+                        description: "Time to make a decision on purchasing"
+                    }
+                },
+                required: ["confirmation", "opportunity_name", "budget__c", "authority__c", "need__c", "timing__c"],
+            },
+        }
+    );
+
+    const draftAsanaTask = FunctionTool.from(
+        ({ taskName, notes }: { taskName: string, notes: string }) => {
+            console.log("Task Name: " + taskName);
+            console.log("Task Notes: " + notes);
+            return "Asana Task Name: " + taskName + "\n" +
+                "Task Notes: " + notes;
+        },
+        {
+            name: "draftAsanaTask",
+            description: "Use this function to draft a task in Asana. This is a required function step" +
+                "before creating a task in Asana. Prompt confirmation from " +
+                "user to trigger the confirm and create Asana Task step. This function does not create the Asana task. " +
+                "This function only drafts an Asana task and prompts for confirmation",
+            parameters: {
+                type: "object",
+                properties: {
+                    taskName: {
+                        type: "string",
+                        description: "The name of task",
+                    },
+                    notes: {
+                        type: "string",
+                        description: "Additional notes for the Asana task",
+                    },
+                },
+                required: ["taskName"],
+            },
+        }
+    );
+
+
+    const confirmAndCreateAsanaTask = FunctionTool.from(
+        async({ confirmation, taskName, notes }: { confirmation: string; taskName: string; notes: string }) => {
+            console.log("Asana Task Confirmed: " + confirmation);
+
+            const response = await createAsanaTask({taskName, notes}, signJwt(userId));
+            if(response.status){
+                return "Successfully Sent";
+            }
+            return "Message not sent successfully";
+        },
+        {
+            name: "confirmAndCreateAsanaTask",
+            description: "Use this function to create a task in Asana only after a draft for the task has been created. Do" +
+                "not use this function if an affirmative confirmation is not given. Do not use this function if" +
+                "an Asana task draft has not been created",
+            parameters: {
+                type: "object",
+                properties: {
+                    taskName: {
+                        type: "string",
+                        description: "The drafted name of task",
+                    },
+                    notes: {
+                        type: "string",
+                        description: "Additional notes on the drafted task"
+                    },
+                    confirmation: {
+                        type: "string",
+                        description: "affirmative confirmation to send draft message",
+                    },
+                },
+                required: ["confirmation", "taskName"],
+            },
+        }
+    );
+
     const index = await getDataSource(params);
     const permissionFilters = generateFilters(documentIds || []);
     const queryEngine = index.asQueryEngine({
@@ -166,8 +363,11 @@ export async function createAgent(userId: string | (() => string), documentIds?:
     });
 
     return new OpenAIAgent({
-        tools: [draftSlackMessage, confirmAndSendSlackMessage,
+        tools: [summarizeTranscript,
+            draftSlackMessage, confirmAndSendSlackMessage,
             draftSalesforceContact, confirmAndCreateSalesforceContact,
+            draftSalesforceOpportunity, confirmAndCreateSalesforceOpportunity,
+            draftAsanaTask, confirmAndCreateAsanaTask,
             queryEngineTool]
     });
 }

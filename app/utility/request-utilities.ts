@@ -45,3 +45,47 @@ export async function createSalesforceContact(contact: {first_name: string, last
             console.log("Error creating Salesforce contact: " + error)
         );
 }
+
+export async function createSalesforceOpportunity(opportunity: {opportunity_name: string, budget__c: string, authority__c: string, need__c: string, timing__c: string}, jwt: string) {
+    return await fetch(process.env.PUT_SALESFORCE_OPPORTUNITY_ENDPOINT ?? "", {
+        method: "POST",
+        body: JSON.stringify(opportunity),
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: "bearer " + jwt,
+        },
+    })
+        .then((response) => response.json())
+        .catch((error) =>
+            console.log("Error creating Salesforce opportunity: " + error)
+        );
+}
+
+export async function createAsanaTask(task: {taskName: string, notes?: string}, jwt: string) {
+    return await fetch(process.env.CREATE_ASANA_TASK_ENDPOINT ?? "", {
+        method: "POST",
+        body: JSON.stringify(task),
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: "bearer " + jwt,
+        },
+    })
+        .then((response) => response.json())
+        .catch((error) =>
+            console.log("Error creating Salesforce opportunity: " + error)
+        );
+}
+
+export async function getAsanaTeam(jwt: string) {
+    return await fetch(process.env.CREATE_ASANA_TASK_ENDPOINT ?? "", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization: "bearer " + jwt,
+        },
+    })
+        .then((response) => response.json())
+        .catch((error) =>
+            console.log("Error creating Salesforce opportunity: " + error)
+        );
+}
