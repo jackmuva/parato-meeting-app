@@ -61,7 +61,7 @@ export async function createSalesforceOpportunity(opportunity: {opportunity_name
         );
 }
 
-export async function createAsanaTask(task: {taskName: string, notes?: string}, jwt: string) {
+export async function createAsanaTask(task: {taskName: string, notes?: string, assignee?: string}, jwt: string) {
     return await fetch(process.env.CREATE_ASANA_TASK_ENDPOINT ?? "", {
         method: "POST",
         body: JSON.stringify(task),
@@ -72,12 +72,12 @@ export async function createAsanaTask(task: {taskName: string, notes?: string}, 
     })
         .then((response) => response.json())
         .catch((error) =>
-            console.log("Error creating Salesforce opportunity: " + error)
+            console.log("Error creating Asana Task: " + error)
         );
 }
 
 export async function getAsanaTeam(jwt: string) {
-    return await fetch(process.env.CREATE_ASANA_TASK_ENDPOINT ?? "", {
+    return await fetch(process.env.GET_ASANA_TEAM_ENDPOINT ?? "", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -86,6 +86,6 @@ export async function getAsanaTeam(jwt: string) {
     })
         .then((response) => response.json())
         .catch((error) =>
-            console.log("Error creating Salesforce opportunity: " + error)
+            console.log("Error getting Asana Team members: " + error)
         );
 }

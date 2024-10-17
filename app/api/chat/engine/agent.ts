@@ -2,7 +2,7 @@ import {FunctionTool, OpenAIAgent, QueryEngineTool} from "llamaindex";
 import {
     createAsanaTask,
     createSalesforceContact,
-    createSalesforceOpportunity,
+    createSalesforceOpportunity, getAsanaTeam,
     sendSlack,
     signJwt
 } from "@/app/utility/request-utilities";
@@ -281,17 +281,20 @@ export async function createAgent(userId: string | (() => string), documentIds?:
     );
 
     const draftAsanaTask = FunctionTool.from(
-        ({ taskName, notes }: { taskName: string, notes: string }) => {
+        async({ taskName, notes }: { taskName: string, notes: string }) => {
             console.log("Task Name: " + taskName);
             console.log("Task Notes: " + notes);
-            return "Asana Task Name: " + taskName + "\n" +
-                "Task Notes: " + notes;
+            const response = await getAsanaTeam(signJwt(userId));
+            return response.members;
         },
         {
             name: "draftAsanaTask",
             description: "Use this function to draft a task in Asana. This is a required function step" +
-                "before creating a task in Asana. Prompt confirmation from " +
-                "user to trigger the confirm and create Asana Task step. This function does not create the Asana task. " +
+                "before creating a task in Asana. Prompt user to assign a team member form their Asana team if assignee is not mentioned. " +
+                "Get the ID of a team member before assigning it to an assignee." +
+                "If user does not need an assignee or has assigned an assignee with their id, proceed to the confirm " +
+                "and create Asana task step. " +
+                "This function does not create the Asana task. " +
                 "This function only drafts an Asana task and prompts for confirmation",
             parameters: {
                 type: "object",
@@ -304,18 +307,53 @@ export async function createAgent(userId: string | (() => string), documentIds?:
                         type: "string",
                         description: "Additional notes for the Asana task",
                     },
+                    assignee:{
+                        type: "string",
+                        description: "The ID for the assignee of the Asana Task"
+                    },
                 },
                 required: ["taskName"],
             },
         }
     );
 
+    const getAsanaMemberId = FunctionTool.from(
+        async({ name }: { name: string }) => {
+            console.log("Getting Asana ID for: " + name);
+            const response = await getAsanaTeam(signJwt(userId));
+            console.log(response);
+            for(const member of response.members){
+                if(member.name === name){
+                    return member.gid;
+                }
+            }
+            return "Cannot be found";
+        },
+        {
+            name: "getAsanaMemberId",
+            description: "Use this function after a team member is assigned to an Asana task. This function gets the ID " +
+                "of an Asana team member",
+            parameters: {
+                type: "object",
+                properties: {
+                    name: {
+                        type: "string",
+                        description: "The name of the team member",
+                    }
+                },
+                required: ["name"],
+            },
+        }
+    );
+
 
     const confirmAndCreateAsanaTask = FunctionTool.from(
-        async({ confirmation, taskName, notes }: { confirmation: string; taskName: string; notes: string }) => {
+        async({ confirmation, taskName, notes, assignee }: { confirmation: string; taskName: string; notes: string; assignee: string }) => {
             console.log("Asana Task Confirmed: " + confirmation);
+            console.log("Notes: " + notes);
+            console.log("assignee: " + assignee);
 
-            const response = await createAsanaTask({taskName, notes}, signJwt(userId));
+            const response = await createAsanaTask({taskName, notes, assignee}, signJwt(userId));
             if(response.status){
                 return "Successfully Sent";
             }
@@ -323,7 +361,9 @@ export async function createAgent(userId: string | (() => string), documentIds?:
         },
         {
             name: "confirmAndCreateAsanaTask",
-            description: "Use this function to create a task in Asana only after a draft for the task has been created. Do" +
+            description: "Use this function to create a task in Asana only after a draft for the task has been created. " +
+                "If an assignee is provided, check to see if the assignee is an ID number. If the assignee is not an ID, get" +
+                "the ID of the Asana team member. Do" +
                 "not use this function if an affirmative confirmation is not given. Do not use this function if" +
                 "an Asana task draft has not been created",
             parameters: {
@@ -336,6 +376,10 @@ export async function createAgent(userId: string | (() => string), documentIds?:
                     notes: {
                         type: "string",
                         description: "Additional notes on the drafted task"
+                    },
+                    assignee:{
+                        type: "string",
+                        description: "The ID for the assignee of the Asana Task"
                     },
                     confirmation: {
                         type: "string",
@@ -367,7 +411,7 @@ export async function createAgent(userId: string | (() => string), documentIds?:
             draftSlackMessage, confirmAndSendSlackMessage,
             draftSalesforceContact, confirmAndCreateSalesforceContact,
             draftSalesforceOpportunity, confirmAndCreateSalesforceOpportunity,
-            draftAsanaTask, confirmAndCreateAsanaTask,
+            draftAsanaTask, confirmAndCreateAsanaTask, getAsanaMemberId,
             queryEngineTool]
     });
 }
