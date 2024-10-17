@@ -13,6 +13,7 @@
   "dependencies": {
     "@apidevtools/swagger-parser": "^10.1.0",
     "@e2b/code-interpreter": "0.0.9-beta.3",
+    "@heroicons/react": "^2.1.5",
     "@llamaindex/core": "^0.2.6",
     "@llamaindex/pdf-viewer": "^1.1.3",
     "@openfga/sdk": "^0.7.0",
@@ -22,8 +23,10 @@
     "@radix-ui/react-slot": "^1.0.2",
     "@radix-ui/react-tabs": "^1.1.0",
     "@useparagon/connect": "^1.0.17",
+    "@vercel/postgres": "^0.10.0",
     "ai": "3.3.42",
     "ajv": "^8.12.0",
+    "bcrypt": "^5.1.1",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "dotenv": "^16.3.1",
@@ -34,6 +37,7 @@
     "lucide-react": "^0.294.0",
     "marked": "^14.1.2",
     "next": "^14.2.4",
+    "next-auth": "^5.0.0-beta.22",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-markdown": "^8.0.7",
@@ -47,9 +51,11 @@
     "tailwind-merge": "^2.1.0",
     "tiktoken": "^1.0.15",
     "uuid": "^9.0.1",
-    "vaul": "^0.9.1"
+    "vaul": "^0.9.1",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/bcrypt": "^5.0.2",
     "@types/jsonwebtoken": "^9.0.7",
     "@types/node": "^20.10.3",
     "@types/react": "^18.2.42",
